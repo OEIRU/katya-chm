@@ -1,46 +1,97 @@
 #include <iostream>
-#include <cmath>
+#include <sstream>
 #include <vector>
-#include "Point.h"
-#include "Cubic_Interpolation_Spline_1D.h"
-#include "Smoothing_Spline_1D.h"
 #include <fstream>
-#include <iomanip>
+#include <cmath>
+#include <iomanip>  // Добавлено для управления форматом вывода
+#include "Cubic_Interpolation_Spline_1D.h"
+#include "Point.h"
+#include <locale>
+
+using namespace Com_Methods;
+
+// Аналитическая функция для тестирования
+double f(double x) {
+    return 1.0 / x + 0.1;
+}
+
+// Первая производная аналитической функции
+double f_prime(double x) {
+    return -1.0 / (x * x);
+}
+
+// Функция для вычисления погрешностей
+void calculate_and_store_errors(const std::vector<Point>& points, const std::vector<double>& f_values, double h, const Cubic_Interpolation_Spline_1D& spline, const std::string& file_prefix) {
+    // Открываем файлы для записи
+    std::ofstream spline_file(file_prefix + "_spline_data.txt");
+    std::ofstream error_file(file_prefix + "_error_data.txt");
+
+    if (!spline_file.is_open() || !error_file.is_open()) {
+        std::cerr << "Ошибка открытия файлов!" << std::endl;
+        return;
+    }
+
+    // Заголовки для файлов
+    spline_file << std::fixed << std::setprecision(16); // Установка формата вывода
+    spline_file << "x\tg(x)\tg'(x)\tg''(x)\n";
+
+    error_file << std::fixed << std::setprecision(16); // Установка формата вывода
+    error_file << "x\tabs(f(x) - g(x))\tabs(f'(x) - g'(x))\n";
+
+    // Обрабатываем точки в пределах [0.5, 1] с шагом h
+    for (double x = 0.5; x <= 1.0; x += h) {
+        double res[3];   // Для хранения значений сплайна: g(x), g'(x), g''(x)
+        spline.Get_Value(Point(x, 0.0, 0.0), res);
+
+        // Вычисляем аналитику
+        double fx = f(x);
+        double fx_prime = f_prime(x);
+
+        // Записываем в файл сплайн-аппроксимацию
+        spline_file << x << "\t" << res[0] << "\t" << res[1] << "\t" << res[2] << "\n";
+
+        // Вычисляем и записываем погрешности
+        error_file << x << "\t"
+            << std::abs(fx - res[0]) << "\t"
+            << std::abs(fx_prime - res[1]) << "\n";
+    }
+
+    // Закрываем файлы
+    spline_file.close();
+    error_file.close();
+}
 
 int main() {
-    try {
-        // РЎРѕР·РґР°РµРј РІРµРєС‚РѕСЂ С‚РѕС‡РµРє Рё СЃРѕРѕС‚РІРµС‚СЃС‚РІСѓСЋС‰РёС… Р·РЅР°С‡РµРЅРёР№ С„СѓРЅРєС†РёРё
-        std::vector<Com_Methods::Point> Mesh = {
-            Com_Methods::Point(0.25, 0.0, 0.0),
-            Com_Methods::Point(0.5, 0.0, 0.0),
-            Com_Methods::Point(1.0, 0.0, 0.0)
-        };
+    setlocale(LC_ALL, "ru-RU");
 
-        std::vector<double> Func = { 4.1, 2.1, 1.1 }; // Р—РЅР°С‡РµРЅРёСЏ f(x) РґР»СЏ РєР°Р¶РґРѕР№ С‚РѕС‡РєРё
+    // Массив точек (узлов) для интерполяции
+    std::vector<Point> points;
+    std::vector<double> f_values;
 
-        // РЎРѕР·РґР°РµРј СЃРїР»Р°Р№РЅ
-        Com_Methods::Cubic_Interpolation_Spline_1D Spline;
-        Spline.Update_Spline(Mesh, Func);
-
-        // Р’С‹С‡РёСЃР»СЏРµРј Р·РЅР°С‡РµРЅРёСЏ СЃРїР»Р°Р№РЅР° РІ Р·Р°РґР°РЅРЅС‹С… С‚РѕС‡РєР°С…
-        double Res[3];
-
-        // РџСЂРёРјРµСЂ РёСЃРїРѕР»СЊР·РѕРІР°РЅРёСЏ СЃРїР»Р°Р№РЅР° РЅР° С‚РѕС‡РєР°С… 0.25, 0.5 Рё 1.0
-        for (double x : {0.25, 0.5, 1.0}) {
-            Com_Methods::Point P(x, 0.0, 0.0);
-            Spline.Get_Value(P, Res);
-            std::cout << "f(" << x << ") = " << Res[0] << ", f'(" << x << ") = " << Res[1] << ", f''(" << x << ") = " << Res[2] << std::endl;
-        }
-
-        // РўР°РєР¶Рµ РјРѕР¶РЅРѕ РІС‹С‡РёСЃР»РёС‚СЊ Рё РІС‹РІРµСЃС‚Рё Р·РЅР°С‡РµРЅРёСЏ С„СѓРЅРєС†РёРё f(x) = x^{-1} + 0.1 РґР»СЏ РїСЂРѕРІРµСЂРєРё
-        std::cout << "Function values:" << std::endl;
-        for (double x : {0.25, 0.5, 1.0}) {
-            std::cout << "f(" << x << ") = " << (1.0 / x + 0.1) << std::endl;
-        }
-    }
-    catch (std::exception& Ex) {
-        std::cout << "Error: " << Ex.what() << std::endl;
+    // Создаем сетку узлов [0.5, 1] с шагом 0.1
+    double h = 0.1;
+    for (double x = 0.5; x <= 1.0; x += h) {
+        points.push_back(Point(x, 0.0, 0.0));  // Используем только координату x, y и z пока не нужны
+        f_values.push_back(f(x));              // Значения функции в узлах
     }
 
+    // Создаем объект сплайна
+    Cubic_Interpolation_Spline_1D spline;
+
+    // Обновляем сплайн, используя точки и значения функции
+    spline.Update_Spline(points, f_values);
+
+    // Выполняем расчеты для различных шагов
+    std::vector<double> steps = { 0.025, 0.0125, 0.00625 };
+
+    for (size_t i = 0; i < steps.size(); ++i) {
+        // Для каждого шага создаем уникальный префикс для файлов
+        std::string file_prefix = "step_" + std::to_string(i + 1);
+
+        // Вычисляем значения и погрешности для каждого шага
+        calculate_and_store_errors(points, f_values, steps[i], spline, file_prefix);
+    }
+
+    std::cout << "Данные успешно записаны в файлы." << std::endl;
     return 0;
 }
